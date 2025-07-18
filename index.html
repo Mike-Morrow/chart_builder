@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Sales Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .main-content {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+            background: white;
+        }
+        
+        .controls-container {
+            width: 300px;
+            flex-shrink: 0;
+            height: 600px;
+            transition: width 0.3s ease;
+            position: relative;
+        }
+        
+        .controls-container.hidden {
+            width: 40px;
+            overflow: visible;
+        }
+        
+        .controls-container.hidden .controls {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            height: 100%;
+            overflow-y: auto;
+        }
+        
+        .control-group {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease;
+        }
+        
+        .control-group:hover {
+            transform: translateY(-2px);
+        }
+        
+        .control-group h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+        
+        select, input {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            font-size: 12px;
+            transition: border-color 0.3s ease;
+            box-sizing: border-box;
+        }
+        
+        select:focus, input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .checkbox-item input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+        
+        .checkbox-item label {
+            font-size: 12px;
+        }
+        
+        .chart-container {
+            flex: 1;
+            padding: 20px;
+            background: white;
+        }
+        
+        .toggle-controls {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+        
+        .toggle-controls:hover {
+            background: #2980b9;
+            transform: scale(1.1);
+        }
+        
+        #chart {
+            width: 100%;
+            height: 600px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .breakdown-controls {
+            display: none;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .breakdown-controls.show {
+            display: block;
+        }
+        
+        .date-granularity-controls {
+            display: none;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .date-granularity-controls label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 600;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Interactive Sales Dashboard</h1>
+        </div>
+        
+        <div class="main-content">
+            <div class="controls-container" id="controlsContainer">
+                <button class="toggle-controls" id="toggleControls" title="Toggle Controls">⚙️</button>
+                <div class="controls">
+                    <div class="control-group">
+                        <h3>📈 X-Axis</h3>
+                        <select id="xAxis">
+                            <option value="orderDate">Order Date</option>
+                            <option value="category">Category</option>
+                            <option value="product">Product</option>
+                            <option value="month">Month</option>
+                        </select>
+                        <div class="date-granularity-controls" id="dateGranularityControls">
+                            <label>Date Granularity:</label>
+                            <select id="dateGranularity">
+                                <option value="day">Daily</option>
+                                <option value="week">Weekly</option>
+                                <option value="month" selected>Monthly</option>
+                                <option value="quarter">Quarterly</option>
+                                <option value="year">Yearly</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <h3>📊 Y-Axis</h3>
+                        <select id="yAxis">
+                            <option value="sales">Sales</option>
+                            <option value="profit">Profit</option>
+                            <option value="quantity">Quantity</option>
+                        </select>
+                    </div>
+                    
+                    <div class="control-group">
+                        <h3>📈 Chart Type</h3>
+                        <select id="chartType">
+                            <option value="line">Line Chart</option>
+                            <option value="bar">Bar Chart</option>
+                            <option value="scatter">Scatter Plot</option>
+                            <option value="area">Area Chart</option>
+                        </select>
+                    </div>
+                    
+                    <div class="control-group">
+                        <h3>📋 Series</h3>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="salesSeries" value="sales" checked>
+                                <label for="salesSeries">Sales</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="profitSeries" value="profit">
+                                <label for="profitSeries">Profit</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="quantitySeries" value="quantity">
+                                <label for="quantitySeries">Quantity</label>
+                            </div>
+                        </div>
+                        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e9ecef;">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="runningTotals">
+                                <label for="runningTotals">Running Totals</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <h3>🎯 Breakdown</h3>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="enableBreakdown">
+                            <label for="enableBreakdown">Enable Breakdown</label>
+                        </div>
+                        <div class="breakdown-controls" id="breakdownControls">
+                            <label>Breakdown by:</label>
+                            <select id="breakdownDimension">
+                                <option value="category">Category</option>
+                                <option value="product">Product</option>
+                                <option value="month">Month</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <h3>🏷️ Labels</h3>
+                        <input type="text" id="xAxisLabel" placeholder="X-Axis Label" value="Order Date">
+                        <input type="text" id="yAxisLabel" placeholder="Y-Axis Label" value="Sales ($)" style="margin-top: 8px;">
+                    </div>
+                    
+                    <div class="control-group">
+                        <h3>📏 Y-Scale</h3>
+                        <input type="number" id="yAxisMin" placeholder="Min Value" step="any">
+                        <input type="number" id="yAxisMax" placeholder="Max Value" step="any" style="margin-top: 8px;">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <div id="chart"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Wait for DOM to be fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // Sample data generation
+            const categories = ['Electronics', 'Furniture', 'Office Supplies', 'Technology', 'Clothing'];
+            const products = {
+                'Electronics': ['Laptop', 'Phone', 'Tablet', 'Headphones', 'Camera'],
+                'Furniture': ['Chair', 'Desk', 'Table', 'Bookshelf', 'Cabinet'],
+                'Office Supplies': ['Pen', 'Paper', 'Stapler', 'Folder', 'Notebook'],
+                'Technology': ['Monitor', 'Keyboard', 'Mouse', 'Printer', 'Scanner'],
+                'Clothing': ['Shirt', 'Pants', 'Jacket', 'Shoes', 'Hat']
+            };
+            
+            function generateSampleData() {
+                const data = [];
+                const startDate = new Date('2023-01-01');
+                const endDate = new Date('2024-12-31');
+                
+                for (let i = 0; i < 500; i++) {
+                    const randomDate = new Date(startDate.getTime() + Math.random() * (endDate.getTime() - startDate.getTime()));
+                    const category = categories[Math.floor(Math.random() * categories.length)];
+                    const product = products[category][Math.floor(Math.random() * products[category].length)];
+                    const sales = Math.round((Math.random() * 5000 + 500) * 100) / 100;
+                    const profit = Math.round((sales * (0.1 + Math.random() * 0.4)) * 100) / 100;
+                    const quantity = Math.floor(Math.random() * 50) + 1;
+                    
+                    data.push({
+                        orderDate: randomDate.toISOString().split('T')[0],
+                        product: product,
+                        category: category,
+                        sales: sales,
+                        profit: profit,
+                        quantity: quantity,
+                        month: randomDate.toLocaleString('default', { month: 'long', year: 'numeric' })
+                    });
+                }
+                
+                return data.sort((a, b) => new Date(a.orderDate) - new Date(b.orderDate));
+            }
+            
+            const sampleData = generateSampleData();
+            
+            // Initialize chart
+            const chart = echarts.init(document.getElementById('chart'));
+            
+            // Helper function to convert data to running totals
+            function convertToRunningTotals(seriesData) {
+                let runningTotal = 0;
+                return seriesData.map(value => {
+                    runningTotal += value;
+                    return runningTotal;
+                });
+            }
+            
+            // Helper function to get date granularity key
+            function getDateGranularityKey(date, granularity) {
+                const d = new Date(date);
+                
+                switch(granularity) {
+                    case 'day':
+                        return d.toISOString().split('T')[0];
+                    case 'week':
+                        const weekStart = new Date(d);
+                        weekStart.setDate(d.getDate() - d.getDay());
+                        return `Week of ${weekStart.toISOString().split('T')[0]}`;
+                    case 'month':
+                        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                    case 'quarter':
+                        const quarter = Math.floor(d.getMonth() / 3) + 1;
+                        return `${d.getFullYear()}-Q${quarter}`;
+                    case 'year':
+                        return d.getFullYear().toString();
+                    default:
+                        return date;
+                }
+            }
+            
+            // Helper function to format date granularity display
+            function formatDateGranularityDisplay(key, granularity) {
+                switch(granularity) {
+                    case 'day':
+                        return key;
+                    case 'week':
+                        return key;
+                    case 'month':
+                        const [year, month] = key.split('-');
+                        return new Date(year, month - 1).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+                    case 'quarter':
+                        return key;
+                    case 'year':
+                        return key;
+                    default:
+                        return key;
+                }
+            }
+            
+            // Update chart function
+            function updateChart() {
+                const xAxis = document.getElementById('xAxis').value;
+                const yAxis = document.getElementById('yAxis').value;
+                const chartType = document.getElementById('chartType').value;
+                const xAxisLabel = document.getElementById('xAxisLabel').value;
+                const yAxisLabel = document.getElementById('yAxisLabel').value;
+                const yAxisMin = document.getElementById('yAxisMin').value;
+                const yAxisMax = document.getElementById('yAxisMax').value;
+                const dateGranularity = document.getElementById('dateGranularity').value;
+                const runningTotals = document.getElementById('runningTotals').checked;
+                
+                // Show/hide date granularity controls
+                const dateGranularityControls = document.getElementById('dateGranularityControls');
+                if (xAxis === 'orderDate') {
+                    dateGranularityControls.style.display = 'block';
+                } else {
+                    dateGranularityControls.style.display = 'none';
+                }
+                
+                // Show/hide breakdown controls
+                const enableBreakdown = document.getElementById('enableBreakdown').checked;
+                const breakdownControls = document.getElementById('breakdownControls');
+                if (enableBreakdown) {
+                    breakdownControls.classList.add('show');
+                } else {
+                    breakdownControls.classList.remove('show');
+                }
+                
+                // Get selected series
+                const selectedSeries = [];
+                document.querySelectorAll('.checkbox-item input[type="checkbox"]:checked').forEach(checkbox => {
+                    if (checkbox.id !== 'runningTotals' && checkbox.id !== 'enableBreakdown') {
+                        selectedSeries.push(checkbox.value);
+                    }
+                });
+                
+                // If no series selected, show message
+                if (selectedSeries.length === 0) {
+                    const option = {
+                        title: {
+                            text: 'Sales Analytics Dashboard',
+                            left: 'center',
+                            textStyle: {
+                                fontSize: 20,
+                                fontWeight: 'bold'
+                            }
+                        },
+                        xAxis: {
+                            type: 'category',
+                            data: [],
+                            name: xAxisLabel,
+                            nameLocation: 'middle',
+                            nameGap: 30
+                        },
+                        yAxis: {
+                            type: 'value',
+                            name: yAxisLabel,
+                            nameLocation: 'middle',
+                            nameGap: 50,
+                            min: yAxisMin ? parseFloat(yAxisMin) : null,
+                            max: yAxisMax ? parseFloat(yAxisMax) : null
+                        },
+                        series: [],
+                        legend: {
+                            data: [],
+                            top: 40
+                        },
+                        grid: {
+                            left: '10%',
+                            right: '10%',
+                            bottom: '15%',
+                            top: '15%'
+                        },
+                        graphic: {
+                            type: 'text',
+                            left: 'center',
+                            top: 'center',
+                            style: {
+                                text: 'Please select at least one series to display data',
+                                fontSize: 16,
+                                fill: '#999'
+                            }
+                        }
+                    };
+                    chart.setOption(option, true);
+                    return;
+                }
+                
+                // Get breakdown settings
+                const breakdownDimension = enableBreakdown ? document.getElementById('breakdownDimension').value : null;
+                
+                // Process data based on selections
+                let processedData = processDataForChart(sampleData, xAxis, selectedSeries, enableBreakdown, breakdownDimension, dateGranularity, runningTotals, chartType);
+                
+                // Update y-axis label if showing running totals
+                let finalYAxisLabel = yAxisLabel;
+                if (runningTotals) {
+                    finalYAxisLabel = `${yAxisLabel} (Running Total)`;
+                }
+                
+                // Create chart options
+                const option = {
+                    title: {
+                        text: 'Sales Analytics Dashboard',
+                        left: 'center',
+                        textStyle: {
+                            fontSize: 20,
+                            fontWeight: 'bold'
+                        }
+                    },
+                    tooltip: {
+                        trigger: 'axis',
+                        axisPointer: {
+                            type: 'cross'
+                        }
+                    },
+                    legend: {
+                        data: processedData.seriesNames,
+                        top: 40
+                    },
+                    xAxis: {
+                        type: 'category',
+                        data: processedData.xAxisData,
+                        name: xAxisLabel,
+                        nameLocation: 'middle',
+                        nameGap: 30,
+                        axisLabel: {
+                            rotate: (xAxis === 'product' || (xAxis === 'orderDate' && dateGranularity === 'day')) ? 45 : 0
+                        }
+                    },
+                    yAxis: {
+                        type: 'value',
+                        name: finalYAxisLabel,
+                        nameLocation: 'middle',
+                        nameGap: 50,
+                        min: yAxisMin ? parseFloat(yAxisMin) : null,
+                        max: yAxisMax ? parseFloat(yAxisMax) : null
+                    },
+                    series: processedData.series,
+                    grid: {
+                        left: '10%',
+                        right: '10%',
+                        bottom: '15%',
+                        top: '15%'
+                    },
+                    dataZoom: [
+                        {
+                            type: 'slider',
+                            show: true,
+                            start: 0,
+                            end: 100
+                        }
+                    ],
+                    graphic: null
+                };
+                
+                chart.setOption(option, true);
+            }
+            
+            // Process data for chart
+            function processDataForChart(data, xAxis, selectedSeries, enableBreakdown, breakdownDimension, dateGranularity = 'month', runningTotals = false, chartType = 'line') {
+                const result = {
+                    xAxisData: [],
+                    series: [],
+                    seriesNames: []
+                };
+                
+                // Get unique x values and sort them
+                const xValues = [...new Set(data.map(item => {
+                    if (xAxis === 'orderDate') {
+                        return getDateGranularityKey(item[xAxis], dateGranularity);
+                    }
+                    return item[xAxis];
+                }))];
+                
+                // Sort x values appropriately
+                if (xAxis === 'orderDate') {
+                    xValues.sort((a, b) => {
+                        if (dateGranularity === 'day') {
+                            return new Date(a) - new Date(b);
+                        } else if (dateGranularity === 'week') {
+                            const aDate = new Date(a.replace('Week of ', ''));
+                            const bDate = new Date(b.replace('Week of ', ''));
+                            return aDate - bDate;
+                        } else if (dateGranularity === 'month') {
+                            return a.localeCompare(b);
+                        } else if (dateGranularity === 'quarter') {
+                            return a.localeCompare(b);
+                        } else if (dateGranularity === 'year') {
+                            return parseInt(a) - parseInt(b);
+                        }
+                        return a.localeCompare(b);
+                    });
+                } else {
+                    xValues.sort();
+                }
+                
+                // Format display values for x-axis
+                result.xAxisData = xValues.map(value => {
+                    if (xAxis === 'orderDate') {
+                        return formatDateGranularityDisplay(value, dateGranularity);
+                    }
+                    return value;
+                });
+                
+                if (enableBreakdown && breakdownDimension) {
+                    // Create breakdown series for ALL selected measures
+                    selectedSeries.forEach(series => {
+                        const breakdownData = {};
+                        
+                        data.forEach(item => {
+                            let xValue = item[xAxis];
+                            
+                            // Apply date granularity if x-axis is orderDate
+                            if (xAxis === 'orderDate') {
+                                xValue = getDateGranularityKey(item[xAxis], dateGranularity);
+                            }
+                            
+                            const breakdownValue = item[breakdownDimension];
+                            const key = breakdownValue;
+                            
+                            if (!breakdownData[key]) {
+                                breakdownData[key] = {};
+                            }
+                            
+                            if (!breakdownData[key][xValue]) {
+                                breakdownData[key][xValue] = 0;
+                            }
+                            
+                            breakdownData[key][xValue] += item[series];
+                        });
+                        
+                        // Create series for each breakdown value
+                        Object.keys(breakdownData).forEach(breakdownValue => {
+                            let seriesData = xValues.map(xValue => breakdownData[breakdownValue][xValue] || 0);
+                            
+                            // Apply running totals if requested
+                            if (runningTotals) {
+                                seriesData = convertToRunningTotals(seriesData);
+                            }
+                            
+                            // Create series configuration based on chart type
+                            const seriesConfig = {
+                                name: `${series.charAt(0).toUpperCase() + series.slice(1)} - ${breakdownValue}`,
+                                type: chartType,
+                                data: seriesData
+                            };
+                            
+                            // Add type-specific configurations
+                            if (chartType === 'line') {
+                                seriesConfig.smooth = true;
+                                seriesConfig.showSymbol = false;
+                            } else if (chartType === 'scatter') {
+                                seriesConfig.symbolSize = 8;
+                            } else if (chartType === 'area') {
+                                seriesConfig.areaStyle = {};
+                                seriesConfig.smooth = true;
+                            }
+                            
+                            result.series.push(seriesConfig);
+                            result.seriesNames.push(`${series.charAt(0).toUpperCase() + series.slice(1)} - ${breakdownValue}`);
+                        });
+                    });
+                } else {
+                    // Regular series without breakdown
+                    const aggregatedData = {};
+                    
+                    selectedSeries.forEach(series => {
+                        aggregatedData[series] = {};
+                    });
+                    
+                    data.forEach(item => {
+                        let xValue = item[xAxis];
+                        
+                        // Apply date granularity if x-axis is orderDate
+                        if (xAxis === 'orderDate') {
+                            xValue = getDateGranularityKey(item[xAxis], dateGranularity);
+                        }
+                        
+                        selectedSeries.forEach(series => {
+                            if (!aggregatedData[series][xValue]) {
+                                aggregatedData[series][xValue] = 0;
+                            }
+                            aggregatedData[series][xValue] += item[series];
+                        });
+                    });
+                    
+                    selectedSeries.forEach(series => {
+                        let seriesData = xValues.map(xValue => aggregatedData[series][xValue] || 0);
+                        
+                        // Apply running totals if requested
+                        if (runningTotals) {
+                            seriesData = convertToRunningTotals(seriesData);
+                        }
+                        
+                        // Create series configuration based on chart type
+                        const seriesConfig = {
+                            name: series.charAt(0).toUpperCase() + series.slice(1),
+                            type: chartType,
+                            data: seriesData
+                        };
+                        
+                        // Add type-specific configurations
+                        if (chartType === 'line') {
+                            seriesConfig.smooth = true;
+                            seriesConfig.showSymbol = false;
+                        } else if (chartType === 'scatter') {
+                            seriesConfig.symbolSize = 8;
+                        } else if (chartType === 'area') {
+                            seriesConfig.areaStyle = {};
+                            seriesConfig.smooth = true;
+                        }
+                        
+                        result.series.push(seriesConfig);
+                        result.seriesNames.push(series.charAt(0).toUpperCase() + series.slice(1));
+                    });
+                }
+                
+                return result;
+            }
+            
+            // Add event listeners
+            document.getElementById('xAxis').addEventListener('change', updateChart);
+            document.getElementById('yAxis').addEventListener('change', updateChart);
+            document.getElementById('chartType').addEventListener('change', updateChart);
+            document.getElementById('xAxisLabel').addEventListener('input', updateChart);
+            document.getElementById('yAxisLabel').addEventListener('input', updateChart);
+            document.getElementById('yAxisMin').addEventListener('input', updateChart);
+            document.getElementById('yAxisMax').addEventListener('input', updateChart);
+            document.getElementById('dateGranularity').addEventListener('change', updateChart);
+            document.getElementById('runningTotals').addEventListener('change', updateChart);
+            document.getElementById('enableBreakdown').addEventListener('change', updateChart);
+            document.getElementById('breakdownDimension').addEventListener('change', updateChart);
+            
+            // Series checkboxes
+            document.querySelectorAll('.checkbox-item input[type="checkbox"]').forEach(checkbox => {
+                checkbox.addEventListener('change', updateChart);
+            });
+            
+            // Toggle controls functionality
+            document.getElementById('toggleControls').addEventListener('click', function() {
+                const controlsContainer = document.getElementById('controlsContainer');
+                const toggleButton = document.getElementById('toggleControls');
+                
+                if (controlsContainer.classList.contains('hidden')) {
+                    controlsContainer.classList.remove('hidden');
+                    toggleButton.innerHTML = '⚙️';
+                    toggleButton.title = 'Hide Controls';
+                } else {
+                    controlsContainer.classList.add('hidden');
+                    toggleButton.innerHTML = '👁️';
+                    toggleButton.title = 'Show Controls';
+                }
+                
+                // Resize chart after toggle
+                setTimeout(() => {
+                    chart.resize();
+                }, 300);
+            });
+            
+            // Initialize
+            updateChart();
+            
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                chart.resize();
+            });
+        });
+    </script>
+</body>
+</html>
